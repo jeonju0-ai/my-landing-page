@@ -9,7 +9,7 @@ window.addEventListener('scroll', () => {
   } else {
     header.classList.remove('scrolled');
   }
-});
+}, { passive: true });
 
 /* ===========================
    MOBILE NAV TOGGLE
@@ -17,7 +17,6 @@ window.addEventListener('scroll', () => {
 const hamburger = document.getElementById('hamburger');
 const nav = document.getElementById('nav');
 
-// Create overlay element
 const overlay = document.createElement('div');
 overlay.className = 'nav-overlay';
 document.body.appendChild(overlay);
@@ -37,22 +36,14 @@ function closeNav() {
 }
 
 hamburger.addEventListener('click', () => {
-  if (nav.classList.contains('open')) {
-    closeNav();
-  } else {
-    openNav();
-  }
+  nav.classList.contains('open') ? closeNav() : openNav();
 });
 
 overlay.addEventListener('click', closeNav);
-
-// Close nav on link click
-nav.querySelectorAll('a').forEach(link => {
-  link.addEventListener('click', closeNav);
-});
+nav.querySelectorAll('a').forEach(link => link.addEventListener('click', closeNav));
 
 /* ===========================
-   SMOOTH SCROLL FOR ANCHOR LINKS
+   SMOOTH SCROLL
 =========================== */
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
   anchor.addEventListener('click', function (e) {
@@ -72,21 +63,124 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
 =========================== */
 const animatedElements = document.querySelectorAll('[data-aos]');
 
-const observerOptions = {
-  threshold: 0.12,
-  rootMargin: '0px 0px -40px 0px'
-};
-
-const observer = new IntersectionObserver((entries) => {
+const aosObserver = new IntersectionObserver((entries) => {
   entries.forEach(entry => {
     if (entry.isIntersecting) {
       entry.target.classList.add('aos-animate');
-      observer.unobserve(entry.target);
+      aosObserver.unobserve(entry.target);
     }
   });
-}, observerOptions);
+}, {
+  threshold: 0.1,
+  rootMargin: '0px 0px -48px 0px'
+});
 
-animatedElements.forEach(el => observer.observe(el));
+animatedElements.forEach(el => aosObserver.observe(el));
+
+/* ===========================
+   SECTION HEADER UNDERLINE
+=========================== */
+const sectionHeaders = document.querySelectorAll('.section-header');
+
+const headerObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('in-view');
+      headerObserver.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.3 });
+
+sectionHeaders.forEach(el => headerObserver.observe(el));
+
+/* ===========================
+   COUNTER ANIMATION
+=========================== */
+function easeOutQuart(t) {
+  return 1 - Math.pow(1 - t, 4);
+}
+
+function animateCounter(el) {
+  const target = parseInt(el.dataset.count, 10);
+  const suffix = el.dataset.suffix || '';
+  const duration = 1800;
+  const startTime = performance.now();
+
+  function update(currentTime) {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    const easedProgress = easeOutQuart(progress);
+    const current = Math.round(easedProgress * target);
+
+    el.textContent = current + suffix;
+
+    if (progress < 1) {
+      requestAnimationFrame(update);
+    } else {
+      el.textContent = target + suffix;
+    }
+  }
+
+  requestAnimationFrame(update);
+}
+
+const counterElements = document.querySelectorAll('.stat-number[data-count]');
+
+const counterObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting && !entry.target.dataset.counted) {
+      entry.target.dataset.counted = 'true';
+      // 섹션 등장 딜레이와 맞추기 위해 약간 지연
+      const delay = parseInt(entry.target.closest('[data-aos-delay]')?.dataset.aosDelay || 0, 10);
+      setTimeout(() => animateCounter(entry.target), delay);
+      counterObserver.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.5 });
+
+counterElements.forEach(el => counterObserver.observe(el));
+
+/* ===========================
+   CARD HOVER TILT (subtle)
+=========================== */
+document.querySelectorAll('.card').forEach(card => {
+  card.addEventListener('mousemove', (e) => {
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const rotateX = ((y - centerY) / centerY) * -3;
+    const rotateY = ((x - centerX) / centerX) * 3;
+
+    card.style.transform = `translateY(-6px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+  });
+
+  card.addEventListener('mouseleave', () => {
+    card.style.transform = '';
+  });
+});
+
+/* ===========================
+   NAV LINK ACTIVE STATE
+=========================== */
+const sections = document.querySelectorAll('section[id]');
+const navLinks = document.querySelectorAll('.nav a[href^="#"]');
+
+const sectionObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      navLinks.forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === '#' + entry.target.id) {
+          link.classList.add('active');
+        }
+      });
+    }
+  });
+}, { threshold: 0.4 });
+
+sections.forEach(section => sectionObserver.observe(section));
 
 /* ===========================
    CONTACT FORM SUBMIT
@@ -102,17 +196,13 @@ if (contactForm) {
     btn.textContent = '전송 중...';
     btn.disabled = true;
 
-    // Simulate async submission (replace with actual endpoint if needed)
     setTimeout(() => {
       contactForm.reset();
       btn.textContent = '상담 신청하기';
       btn.disabled = false;
       formSuccess.classList.add('show');
 
-      // Hide success message after 6 seconds
-      setTimeout(() => {
-        formSuccess.classList.remove('show');
-      }, 6000);
+      setTimeout(() => formSuccess.classList.remove('show'), 6000);
     }, 1000);
   });
 }
